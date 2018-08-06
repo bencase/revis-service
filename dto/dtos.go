@@ -3,7 +3,7 @@ package dto
 import (
 	"encoding/json"
 	
-	conns "revis-service/connections"
+	conns "github.com/bencase/revis-service/connections"
 )
 
 

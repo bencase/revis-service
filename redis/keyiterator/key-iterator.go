@@ -7,7 +7,7 @@ import (
 	rpool "github.com/mediocregopher/radix.v2/pool"
 	"github.com/mediocregopher/radix.v2/redis"
 
-	"revis-service/dto"
+	"github.com/bencase/revis-service/dto"
 )
 
 const defaultScanSize = 200

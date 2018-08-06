@@ -7,7 +7,7 @@ import (
 	
 	"gopkg.in/yaml.v2"
 	
-	"revis-service/util"
+	"github.com/bencase/revis-service/util"
 )
 
 const filename = "conns.yml"

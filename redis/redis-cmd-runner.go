@@ -7,8 +7,8 @@ import (
 	"github.com/mediocregopher/radix.v2/redis"
 	rpool "github.com/mediocregopher/radix.v2/pool"
 
-	"revis-service/dto"
-	ki "revis-service/redis/keyiterator"
+	"github.com/bencase/revis-service/dto"
+	ki "github.com/bencase/revis-service/redis/keyiterator"
 )
 
 const defaultScanSize = 2000

@@ -3,7 +3,7 @@ package redis
 import (
 	"time"
 	
-	"revis-service/connections"
+	"github.com/bencase/revis-service/connections"
 )
 
 const poolDuration = 31 * time.Minute

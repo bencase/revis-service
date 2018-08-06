@@ -8,9 +8,9 @@ import (
 	
 	glogging "github.com/op/go-logging"
 	
-	rconns "revis-service/connections"
-	"revis-service/dto"
-	"revis-service/redis"
+	rconns "github.com/bencase/revis-service/connections"
+	"github.com/bencase/revis-service/dto"
+	"github.com/bencase/revis-service/redis"
 )
 
 const ExposeHeadersHeader string = "Access-Control-Expose-Headers"

@@ -3,7 +3,7 @@ package redis
 import (
 	"errors"
 
-	"revis-service/dto"
+	"github.com/bencase/revis-service/dto"
 )
 
 type RedisService struct {

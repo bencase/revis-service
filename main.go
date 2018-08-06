@@ -8,7 +8,7 @@ import (
 	"github.com/rs/cors"
 	glogging "github.com/op/go-logging"
 	
-	rserver "revis-service/server"
+	rserver "github.com/bencase/revis-service/server"
 )
 
 const port = ":8080"
