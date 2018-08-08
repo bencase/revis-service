@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"errors"
 	"io"
 	"strconv"
 	
@@ -23,7 +24,7 @@ const (
 
 type RedisCmdRunner interface {
 	io.Closer
-	GetValuesOfKeys(keys []string) (map[string]string, error)
+	//GetValuesOfKeys(keys []string) (map[string]string, error)
 	GetKeysWithValues(pattern string, keyChan chan<- []*dto.Key,
 		finalChan chan<- []*dto.Key, errorChan chan<- error)
 }
@@ -60,31 +61,9 @@ func getDialFunc(password string) func(network string, addr string) (*redis.Clie
 	}
 }
 
-func (this *iRedisCmdRunner) GetValuesOfKeys(keys []string) (map[string]string, error) {
-
-	keyValsMap := make(map[string]string)
-	
-	conn, err := this.pool.Get()
-	if err != nil { return nil, err }
-	defer this.pool.Put(conn)
-
-	for _, key := range keys {
-		conn.PipeAppend("GET", key)
-	}
-
-	resps, err := getResponsesFromPipeline(conn)
-	if err != nil { return nil, err }
-	for i, resp := range resps {
-		val, err := resp.Str()
-		if err != nil { return nil, err }
-		keyValsMap[keys[i]] = val
-	}
-
-	return keyValsMap, nil
-}
-
 func (this *iRedisCmdRunner) GetKeysWithValues(pattern string, keyChan chan<- []*dto.Key,
 		finalChan chan<- []*dto.Key, errorChan chan<- error) {
+	defer recoverFromPanic(keyChan, finalChan, errorChan)
 
 	keyIterator, err := ki.NewKeyIterator(this.pool, pattern)
 	if err != nil {
@@ -281,4 +260,17 @@ func (this *keySet) toArray() []string {
 		i++
 	}
 	return keys
+}
+
+func recoverFromPanic(keyChan chan<- []*dto.Key,
+		finalChan chan<- []*dto.Key, errorChan chan<- error) {
+	if r := recover(); r != nil {
+		var err error
+		switch rtyp := r.(type) {
+		case string : err = errors.New(rtyp)
+		case error : err = rtyp
+		default : err = errors.New("Panic is unknown type")
+		}
+		pushErrorToErrorChan(err, keyChan, finalChan, errorChan)
+	}
 }

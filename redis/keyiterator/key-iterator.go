@@ -10,7 +10,11 @@ import (
 	"github.com/bencase/revis-service/dto"
 )
 
-const defaultScanSize = 200
+const defaultScanSize = 50000
+
+// When scanning, a list of keys will be put together. If, after a scan, there are more
+// keys left and the list is less than the below size, it will scan again.
+const minimumSizeOfList = 200
 
 var NoMoreElements = errors.New("There are no further elements in this iterator")
 
@@ -64,6 +68,9 @@ func (this *iKeyIterator) Next() (*dto.Key, error) {
 				this.err = err
 				return nil, err
 			}
+			if len(this.keysList) == 0 {
+				return nil, NoMoreElements
+			}
 			key = this.keysList[0]
 			this.index = 1
 		}
@@ -76,10 +83,16 @@ func (this *iKeyIterator) Next() (*dto.Key, error) {
 }
 
 func (this *iKeyIterator) refillKeyStrList() error {
-	newCursorVal, newKeys, err := getKeysList(this.conn, this.scanCursor, this.pattern)
-	if err != nil { return err }
-	this.scanCursor = newCursorVal
-	this.keysList = newKeys
+	continueScanning:= true
+	var keysScanned []*dto.Key
+	for continueScanning {
+		newCursorVal, newKeys, err := getKeysList(this.conn, this.scanCursor, this.pattern)
+		if err != nil { return err }
+		this.scanCursor = newCursorVal
+		keysScanned = append(keysScanned, newKeys...)
+		continueScanning = !(len(keysScanned) >= minimumSizeOfList || newCursorVal == 0)
+	}
+	this.keysList = keysScanned
 	return nil
 }
 
