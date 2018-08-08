@@ -33,6 +33,8 @@ func NewRedisServer() (*RedisServer, error) {
 
 
 func (this *RedisServer) SayHello(w http.ResponseWriter, r *http.Request) {
+	defer recoverFromPanic(w, "SayHello")
+
 	message := "Hello, World!"
 
 	w.Write([]byte(message))
@@ -40,6 +42,7 @@ func (this *RedisServer) SayHello(w http.ResponseWriter, r *http.Request) {
 
 
 func (this *RedisServer) GetConnections(w http.ResponseWriter, r *http.Request) {
+	defer recoverFromPanic(w, "GetConnections")
 	w.Header().Add("Content-Type", "application/json")
 	
 	conns, err := rconns.ReadConnections()
@@ -61,6 +64,7 @@ func (this *RedisServer) GetConnections(w http.ResponseWriter, r *http.Request) 
 
 func (this *RedisServer) UpsertConnections(w http.ResponseWriter,
 		r *http.Request) {
+	defer recoverFromPanic(w, "UpsertConnections")
 	w.Header().Add("Content-Type", "application/json")
 	
 	reader := r.Body
@@ -83,6 +87,7 @@ func (this *RedisServer) UpsertConnections(w http.ResponseWriter,
 
 func (this *RedisServer) DeleteConnections(w http.ResponseWriter,
 		r *http.Request) {
+	defer recoverFromPanic(w, "DeleteConnections")
 	w.Header().Add("Content-Type", "application/json")
 	
 	reader := r.Body
@@ -105,6 +110,7 @@ func (this *RedisServer) DeleteConnections(w http.ResponseWriter,
 
 func (this *RedisServer) GetKeysWithValues(w http.ResponseWriter,
 		r *http.Request) {
+	defer recoverFromPanic(w, "GetKeysWithValues")
 	// Route the request based on whether it has a scanId or not
 	scanId := r.Header.Get(ScanIdHeader)
 	if scanId != "" && scanId != "0" {
@@ -117,6 +123,7 @@ func (this *RedisServer) GetKeysWithValues(w http.ResponseWriter,
 
 func (this *RedisServer) startGettingKeysWithValues(w http.ResponseWriter,
 		r *http.Request) {
+	defer recoverFromPanic(w, "startGettingKeysWithValues")
 	w.Header().Add("Content-Type", "application/json")
 
 	connName := r.Header.Get(ConnNameHeader)
@@ -138,6 +145,7 @@ func (this *RedisServer) startGettingKeysWithValues(w http.ResponseWriter,
 
 
 func (this *RedisServer) getMoreKeys(w http.ResponseWriter, r *http.Request) {
+	defer recoverFromPanic(w, "getMoreKeys")
 	w.Header().Add("Content-Type", "application/json")
 
 	scanIdStr := r.Header.Get(ScanIdHeader)
@@ -204,4 +212,16 @@ func returnBaseResponse(w http.ResponseWriter) {
 	}
 	
 	w.Write(respBytes)
+}
+
+func recoverFromPanic(w http.ResponseWriter, fname string) {
+	if r := recover(); r != nil {
+		var err error
+		switch rtyp := r.(type) {
+		case string : err = errors.New(rtyp)
+		case error : err = rtyp
+		default : err = errors.New("Panic is unknown type")
+		}
+		processError(w, "Panic in " + fname + ":", err)
+	}
 }
