@@ -45,7 +45,7 @@ func main() {
 	
 	corsOpts := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"HEAD", "GET", "POST"},
+		AllowedMethods: []string{"HEAD", "GET", "POST", "OPTIONS"},
 		AllowedHeaders: []string{rserver.ConnNameHeader,
 			rserver.PatternHeader,
 			rserver.ScanIdHeader},
