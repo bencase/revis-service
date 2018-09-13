@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	
@@ -11,12 +12,19 @@ import (
 	rserver "github.com/bencase/revis-service/server"
 )
 
-const port = ":8080"
-
 const pathPrefix = "/api"
 const redisPathPrefix = "/redis"
 
+const portFlag = "port"
+
 var logger = glogging.MustGetLogger("main")
+
+var port = "63799"
+
+func init() {
+	flag.StringVar(&port, portFlag, "63799", "the port on which to start the server")
+	flag.Parse()
+}
 
 func main() {
 	
@@ -53,8 +61,8 @@ func main() {
 	handler := corsOpts.Handler(r)
 	http.Handle("/", handler)
 	
-	logger.Info("Serving on",port)
-	if err := http.ListenAndServe(port, nil); err != nil {
+	logger.Info("Serving on", ":" + port)
+	if err := http.ListenAndServe(":" + port, nil); err != nil {
 		panic(err)
 	}
 }
