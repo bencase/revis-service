@@ -14,9 +14,10 @@ import (
 )
 
 const ExposeHeadersHeader string = "Access-Control-Expose-Headers"
-const ConnNameHeader string = "connName"
+const ConnNameHeader string = "connname"
 const PatternHeader string = "pattern"
-const ScanIdHeader string = "scanId"
+const ReqIdHeader string = "reqid"
+const ScanIdHeader string = "scanid"
 
 var logger = glogging.MustGetLogger("server")
 
@@ -125,6 +126,8 @@ func (this *RedisServer) startGettingKeysWithValues(w http.ResponseWriter,
 		r *http.Request) {
 	defer recoverFromPanic(w, "startGettingKeysWithValues")
 	w.Header().Add("Content-Type", "application/json")
+	reqid := r.Header.Get(ReqIdHeader)
+	w.Header().Add(ReqIdHeader, reqid)
 
 	connName := r.Header.Get(ConnNameHeader)
 	if connName == "" {
@@ -147,6 +150,8 @@ func (this *RedisServer) startGettingKeysWithValues(w http.ResponseWriter,
 func (this *RedisServer) getMoreKeys(w http.ResponseWriter, r *http.Request) {
 	defer recoverFromPanic(w, "getMoreKeys")
 	w.Header().Add("Content-Type", "application/json")
+	reqid := r.Header.Get(ReqIdHeader)
+	w.Header().Add(ReqIdHeader, reqid)
 
 	scanIdStr := r.Header.Get(ScanIdHeader)
 	scanId, err := strconv.Atoi(scanIdStr)
