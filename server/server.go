@@ -16,7 +16,6 @@ import (
 const ExposeHeadersHeader string = "Access-Control-Expose-Headers"
 const ConnNameHeader string = "connname"
 const PatternHeader string = "pattern"
-const ReqIdHeader string = "reqid"
 const ScanIdHeader string = "scanid"
 
 var logger = glogging.MustGetLogger("server")
@@ -109,6 +108,29 @@ func (this *RedisServer) DeleteConnections(w http.ResponseWriter,
 }
 
 
+func (this *RedisServer) TestConnection(w http.ResponseWriter,
+		r *http.Request) {
+	defer recoverFromPanic(w, "TestConnection")
+	w.Header().Add("Content-Type", "application/json")
+	
+	reader := r.Body
+	conn := new(rconns.Connection)
+	err := json.NewDecoder(reader).Decode(conn)
+	if err != nil {
+		processError(w, "Error decoding json:", err)
+		return
+	}
+
+	err = redis.TestConn(conn)
+	if err != nil {
+		processError(w, "Connection error:", err)
+		return
+	}
+	
+	returnBaseResponse(w)
+}
+
+
 func (this *RedisServer) GetKeysWithValues(w http.ResponseWriter,
 		r *http.Request) {
 	defer recoverFromPanic(w, "GetKeysWithValues")
@@ -126,8 +148,6 @@ func (this *RedisServer) startGettingKeysWithValues(w http.ResponseWriter,
 		r *http.Request) {
 	defer recoverFromPanic(w, "startGettingKeysWithValues")
 	w.Header().Add("Content-Type", "application/json")
-	reqid := r.Header.Get(ReqIdHeader)
-	w.Header().Add(ReqIdHeader, reqid)
 
 	connName := r.Header.Get(ConnNameHeader)
 	if connName == "" {
@@ -150,8 +170,6 @@ func (this *RedisServer) startGettingKeysWithValues(w http.ResponseWriter,
 func (this *RedisServer) getMoreKeys(w http.ResponseWriter, r *http.Request) {
 	defer recoverFromPanic(w, "getMoreKeys")
 	w.Header().Add("Content-Type", "application/json")
-	reqid := r.Header.Get(ReqIdHeader)
-	w.Header().Add(ReqIdHeader, reqid)
 
 	scanIdStr := r.Header.Get(ScanIdHeader)
 	scanId, err := strconv.Atoi(scanIdStr)

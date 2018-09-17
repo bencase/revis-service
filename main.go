@@ -46,6 +46,10 @@ func main() {
 	r.HandleFunc(pathPrefix + redisPathPrefix + "/connections",
 			server.DeleteConnections).
 		Methods("DELETE")
+
+	r.HandleFunc(pathPrefix + redisPathPrefix + "/connections/test",
+			server.TestConnection).
+		Methods("POST")
 	
 	r.HandleFunc(pathPrefix + redisPathPrefix + "/kvs",
 			server.GetKeysWithValues).

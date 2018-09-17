@@ -35,7 +35,7 @@ func (crr *CmdRunnerRegister) createCmdRunner(name string) (RedisCmdRunner,
 	conn, err := connections.GetConnectionWithName(name);
 	if err != nil { return nil, err }
 	
-	cmdRunner, err := getCmdRunner(conn.Host, conn.Port, conn.Password)
+	cmdRunner, err := getCmdRunner(conn.Host, conn.Port, conn.Password, conn.Db)
 	if err != nil { return nil, err }
 	crr.cmdRunnerMap[name] = cmdRunner
 
