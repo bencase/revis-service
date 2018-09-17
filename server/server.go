@@ -14,9 +14,9 @@ import (
 )
 
 const ExposeHeadersHeader string = "Access-Control-Expose-Headers"
-const ConnNameHeader string = "connName"
+const ConnNameHeader string = "connname"
 const PatternHeader string = "pattern"
-const ScanIdHeader string = "scanId"
+const ScanIdHeader string = "scanid"
 
 var logger = glogging.MustGetLogger("server")
 
@@ -101,6 +101,29 @@ func (this *RedisServer) DeleteConnections(w http.ResponseWriter,
 	err = rconns.DeleteConnections(reqObj.ConnectionNames)
 	if err != nil {
 		processError(w, "Error upserting connections:", err)
+		return
+	}
+	
+	returnBaseResponse(w)
+}
+
+
+func (this *RedisServer) TestConnection(w http.ResponseWriter,
+		r *http.Request) {
+	defer recoverFromPanic(w, "TestConnection")
+	w.Header().Add("Content-Type", "application/json")
+	
+	reader := r.Body
+	conn := new(rconns.Connection)
+	err := json.NewDecoder(reader).Decode(conn)
+	if err != nil {
+		processError(w, "Error decoding json:", err)
+		return
+	}
+
+	err = redis.TestConn(conn)
+	if err != nil {
+		processError(w, "Connection error:", err)
 		return
 	}
 	

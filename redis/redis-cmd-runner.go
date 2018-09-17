@@ -24,7 +24,6 @@ const (
 
 type RedisCmdRunner interface {
 	io.Closer
-	//GetValuesOfKeys(keys []string) (map[string]string, error)
 	GetKeysWithValues(pattern string, keyChan chan<- []*dto.Key,
 		finalChan chan<- []*dto.Key, errorChan chan<- error)
 }
@@ -33,32 +32,12 @@ type iRedisCmdRunner struct {
 	pool *rpool.Pool
 }
 
-func getCmdRunner(host string, port string, password string) (RedisCmdRunner, error) {
-	pool, err := rpool.NewCustom("tcp", host + ":" + port, 10, getDialFunc(password))
+func getCmdRunner(host string, port string, password string, db int) (RedisCmdRunner, error) {
+	pool, err := rpool.NewCustom("tcp", host + ":" + port, 10, getDialFunc(password, db, 0))
 	if err != nil {
 		return nil, err
 	}
 	return &iRedisCmdRunner{pool: pool}, nil
-}
-func getDialFunc(password string) func(network string, addr string) (*redis.Client, error) {
-	return func(network string, addr string) (*redis.Client, error) {
-		client, err := redis.Dial(network, addr)
-		if err != nil {
-			return nil, err
-		}
-		// If there's not a password, just return the client
-		if password == "" {
-			return client, nil
-		}
-		// If there is a password, perform auth with it
-		resp := client.Cmd("AUTH", password)
-		err = resp.Err
-		if err != nil {
-			client.Close()
-			return nil, err
-		}
-		return client, nil
-	}
 }
 
 func (this *iRedisCmdRunner) GetKeysWithValues(pattern string, keyChan chan<- []*dto.Key,
