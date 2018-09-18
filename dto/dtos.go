@@ -66,6 +66,17 @@ func (this *ConnectionsResponse) JsonBytes() ([]byte, error) {
 	return json.Marshal(this)
 }
 
+
+type DeleteResponse struct {
+	Count int `json:"count"`
+	DeletedAllKeys bool `json:"deletedAllKeys"`
+	ErrorContainer
+}
+func (this *DeleteResponse) JsonBytes() ([]byte, error) {
+	return json.Marshal(this)
+}
+
+
 type ErrorContainer struct {
 	Error *ErrorResponse `json:"error,omitempty"`
 }

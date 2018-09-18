@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"sync"
 	
 	"github.com/mediocregopher/radix.v2/redis"
 	rpool "github.com/mediocregopher/radix.v2/pool"
@@ -13,6 +14,7 @@ import (
 )
 
 const defaultScanSize = 2000
+const keysToDeleteMaxSize = 50000
 // Key types:
 const (
 	typeString = "string"
@@ -26,6 +28,8 @@ type RedisCmdRunner interface {
 	io.Closer
 	GetKeysWithValues(pattern string, keyChan chan<- []*dto.Key,
 		finalChan chan<- []*dto.Key, errorChan chan<- error)
+	DeleteKeysMatchingPattern(pattern string) (int, error)
+	Flush() error
 }
 
 type iRedisCmdRunner struct {
@@ -85,12 +89,11 @@ func (this *iRedisCmdRunner) GetKeysWithValues(pattern string, keyChan chan<- []
 			pushErrorToErrorChan(err, keyChan, finalChan, errorChan)
 			return
 		}
-		close(keyChan)
-		close(errorChan)
-		finalChan <- keyChunk
-		close(finalChan)
-		return
 	}
+	close(keyChan)
+	close(errorChan)
+	finalChan <- keyChunk
+	close(finalChan)
 }
 func (this *iRedisCmdRunner) getMetadataAndValuesForKeys(keys []*dto.Key) error {
 	conn, err := this.pool.Get()
@@ -198,6 +201,73 @@ func pushErrorToErrorChan(err error, keyChan chan<- []*dto.Key, finalChan chan<-
 	return
 }
 
+
+func (this *iRedisCmdRunner) DeleteKeysMatchingPattern(pattern string) (int, error) {
+	wg := &sync.WaitGroup{}
+	status := NewDeleteStatus()
+	wg.Add(1)
+	go this.startDeletingKeys(pattern, wg, status)
+	wg.Wait()
+	count := status.getCount()
+	err := status.getError()
+	return count, err
+}
+func (this *iRedisCmdRunner) startDeletingKeys(pattern string, wg *sync.WaitGroup,
+		status *deleteStatus) {
+	keyIterator, err := ki.NewKeyIterator(this.pool, pattern)
+	if err != nil {
+		status.setError(err)
+		wg.Done()
+		return
+	}
+	defer keyIterator.Close()
+	keysToDelete := make([]string, 0)
+	for keyIterator.HasNext() {
+		key, err := keyIterator.Next()
+		if err != nil {
+			status.setError(err)
+			wg.Done()
+			return
+		}
+		keysToDelete = append(keysToDelete, key.Key)
+		if len(keysToDelete) >= keysToDeleteMaxSize || !keyIterator.HasNext() {
+			wg.Add(1)
+			go this.delKeysInSlice(keysToDelete, wg, status)
+			keysToDelete = make([]string, 0)
+		}
+	}
+	wg.Done()
+}
+func (this *iRedisCmdRunner) delKeysInSlice(keys []string, wg *sync.WaitGroup,
+		status *deleteStatus) {
+	conn, err := this.pool.Get()
+	if err != nil {
+		status.setError(err)
+		wg.Done()
+		return
+	}
+	defer this.pool.Put(conn)
+	resp := conn.Cmd("UNLINK", keys)
+	count, err := resp.Int()
+	if err != nil {
+		status.setError(err)
+		wg.Done()
+		return
+	}
+	status.addCount(count)
+	wg.Done()
+}
+
+
+func (this *iRedisCmdRunner) Flush() error {
+	conn, err := this.pool.Get()
+	if err != nil { return err }
+	defer this.pool.Put(conn)
+	resp := conn.Cmd("FLUSHDB")
+	return resp.Err
+}
+
+
 func (this *iRedisCmdRunner) Close() error {
 	this.pool.Empty()
 	return nil
@@ -252,4 +322,33 @@ func recoverFromPanic(keyChan chan<- []*dto.Key,
 		}
 		pushErrorToErrorChan(err, keyChan, finalChan, errorChan)
 	}
+}
+
+func NewDeleteStatus() *deleteStatus {
+	return &deleteStatus{mutex: &sync.RWMutex{}}
+}
+type deleteStatus struct {
+	mutex *sync.RWMutex
+	countDeleted int
+	err error
+}
+func (this *deleteStatus) addCount(count int) {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+	this.countDeleted += count
+}
+func (this *deleteStatus) setError(err error) {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+	this.err = err
+}
+func (this *deleteStatus) getCount() int {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+	return this.countDeleted
+}
+func (this *deleteStatus) getError() error {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+	return this.err
 }

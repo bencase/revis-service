@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	
@@ -29,15 +30,6 @@ type RedisServer struct {
 func NewRedisServer() (*RedisServer, error) {
 	redisService := redis.NewRedisService()
 	return &RedisServer{redisService: redisService}, nil
-}
-
-
-func (this *RedisServer) SayHello(w http.ResponseWriter, r *http.Request) {
-	defer recoverFromPanic(w, "SayHello")
-
-	message := "Hello, World!"
-
-	w.Write([]byte(message))
 }
 
 
@@ -206,6 +198,37 @@ func respondWithKeys(w http.ResponseWriter, keys []*dto.Key, scanId int, hasMore
 }
 
 
+func (this *RedisServer) DeleteKeysMatchingPattern(w http.ResponseWriter,
+		r *http.Request) {
+	defer recoverFromPanic(w, "DeleteKeysMatchingPattern")
+	w.Header().Add("Content-Type", "application/json")
+
+	connName := r.Header.Get(ConnNameHeader)
+	if connName == "" {
+		processError(w, "Error parsing header:",
+			errors.New("Header does not contain connection name"))
+		return
+	}
+	pattern := r.Header.Get(PatternHeader)
+
+	deletedAllKeys, count, err := this.redisService.DeleteKeysMatchingPattern(connName, pattern)
+	if err != nil {
+		processError(w, fmt.Sprintf("Error deleting keys matching pattern %[1]v: ",
+			pattern), err)
+		return
+	}
+	
+	delResp := &dto.DeleteResponse{DeletedAllKeys: deletedAllKeys, Count: count}
+	respBytes, err := delResp.JsonBytes()
+	if err != nil {
+		processError(w, "Error marshalling delete response to json:", err)
+		return
+	}
+
+	w.Write(respBytes)
+}
+
+
 func (this *RedisServer) Close() error {
 	return this.redisService.Close()
 }
@@ -245,6 +268,15 @@ func recoverFromPanic(w http.ResponseWriter, fname string) {
 		case error : err = rtyp
 		default : err = errors.New("Panic is unknown type")
 		}
-		processError(w, "Panic in " + fname + ":", err)
+		processError(w, fmt.Sprintf("Panic in %[1]v:", fname), err)
 	}
+}
+
+
+func (this *RedisServer) SayHello(w http.ResponseWriter, r *http.Request) {
+	defer recoverFromPanic(w, "SayHello")
+
+	message := "Hello, World!"
+
+	w.Write([]byte(message))
 }
