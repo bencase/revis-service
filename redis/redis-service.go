@@ -105,3 +105,23 @@ func (this *chanContainer) getNextKeys() ([]*dto.Key, bool, error) {
 	
 	return []*dto.Key{}, false, errors.New("All scan channels are closed")
 }
+
+func (this *RedisService) DeleteKeysMatchingPattern(connName string, pattern string) (bool,
+		int, error) {
+	
+	cmdRunner, err := this.cmdRunnerRegister.GetCmdRunner(connName)
+	if err != nil { return false, 0, err }
+
+	// If the pattern is blank or just a star, execute Flush instead of DeleteKeysMatchingPattern
+	count := 0
+	deletedAllKeys := false;
+	if pattern == "" || pattern == "*" {
+		err = cmdRunner.Flush()
+		if err == nil {
+			deletedAllKeys = true;
+		}
+	} else {
+		count, err = cmdRunner.DeleteKeysMatchingPattern(pattern)
+	}
+	return deletedAllKeys, count, err
+}

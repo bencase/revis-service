@@ -55,6 +55,10 @@ func main() {
 			server.GetKeysWithValues).
 		Methods("GET")
 	
+	r.HandleFunc(pathPrefix + redisPathPrefix + "/keys",
+			server.DeleteKeysMatchingPattern).
+		Methods("DELETE")
+	
 	corsOpts := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"HEAD", "GET", "POST", "OPTIONS"},

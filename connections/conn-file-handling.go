@@ -8,13 +8,14 @@ import (
 	"gopkg.in/yaml.v2"
 	
 	"github.com/bencase/revis-service/util"
+	"github.com/bencase/revis-service/connections/encrypt"
 )
 
 const filename = "conns.yml"
 
 var ConnectionNotFoundError = errors.New("Could not find connection with that name")
 
-func ReadConnections() ([]*Connection, error) {
+func readConnectionsNoDecrypt() ([]*Connection, error) {
 	// If the file doesn't exist, return an empty list
 	if fileDoesntExist() {
 		return []*Connection{}, nil
@@ -25,6 +26,20 @@ func ReadConnections() ([]*Connection, error) {
 	if err != nil { return []*Connection{}, err }
 	conns := make([]*Connection, 0)
 	err = yaml.Unmarshal(inBytes, &conns)
+	return conns, err
+}
+func ReadConnections() ([]*Connection, error) {
+	conns, err := readConnectionsNoDecrypt()
+	if err != nil { return []*Connection{}, err }
+
+	// Decrypt passwords
+	for _, conn := range conns {
+		if conn.Password != "" {
+			decryptedPwd, err := encrypt.DecryptFromBase64(conn.Password)
+			if err != nil { return []*Connection{}, err }
+			conn.Password = decryptedPwd
+		}
+	}
 	return conns, err
 }
 
@@ -44,9 +59,13 @@ func GetConnectionWithName(name string) (*Connection, error) {
 	return nil, nil
 }
 
-func UpsertConnections(newConns []*Connection) error {
+func UpsertConnections(newConnsOriginal []*Connection) error {
+	// Encrypt the passwords of the new connections
+	newConns, err := getConnsWithPasswordsEncrypted(newConnsOriginal)
+	if err != nil { return err }
+
 	// Get current contents of connections file
-	prevConns, err := ReadConnections()
+	prevConns, err := readConnectionsNoDecrypt()
 	if err != nil { return err }
 	
 	// Create a list of connections with all previous connections and the new ones
@@ -54,11 +73,16 @@ func UpsertConnections(newConns []*Connection) error {
 	// Go through each previous connection. If there isn't a new connection with
 	// the same name, add it.
 	for _, conn := range prevConns {
+		hasFoundMatchingName := false
 		// Iterate through the new connections
 		for _, newConn := range newConns {
-			if conn.GetEffectiveName() != newConn.GetEffectiveName() {
-				allConns = append(allConns, conn)
+			if conn.GetEffectiveName() == newConn.GetEffectiveName() {
+				hasFoundMatchingName = true
+				break
 			}
+		}
+		if !hasFoundMatchingName {
+			allConns = append(allConns, conn)
 		}
 	}
 	// Add all the new conns
@@ -75,6 +99,19 @@ func UpsertConnections(newConns []*Connection) error {
 	}
 	return err
 }
+func getConnsWithPasswordsEncrypted(origConns []*Connection) ([]*Connection, error) {
+	encryptedConns := make([]*Connection, 0)
+	for _, conn := range origConns {
+		encryptedConn := *conn
+		if encryptedConn.Password != "" {
+			encryptedPwd, err := encrypt.EncryptToBase64(encryptedConn.Password)
+			if err != nil { return nil, err }
+			encryptedConn.Password = encryptedPwd
+		}
+		encryptedConns = append(encryptedConns, &encryptedConn)
+	}
+	return encryptedConns, nil
+}
 
 func DeleteConnections(connNames []string) error {
 	// If file doesn't exist, there's nothing to delete
@@ -83,7 +120,7 @@ func DeleteConnections(connNames []string) error {
 	}
 	
 	// Get current contents of connections file
-	prevConns, err := ReadConnections()
+	prevConns, err := readConnectionsNoDecrypt()
 	if err != nil { return err }
 	
 	// Create a new slice of connections, with any connections having a name
