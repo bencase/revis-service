@@ -12,7 +12,7 @@ type RedisService struct {
 }
 
 const defaultLimit = 200
-const maxTotalKeysPerScan = 2100
+const maxTotalKeysPerScan = 2000
 
 // It starts at 1 instead of 0 since a 0 may omit the value from the json
 var scanId = 1
