@@ -47,6 +47,7 @@ type Key struct {
 	Key string `json:"key"`
 	Val interface{} `json:"val"`
 	Type string `json:"type,omitempty"`
+	ExpAt int64 `json:"expAt,omitempty"`
 }
 type ZsetVal struct {
 	Zval string `json:"zval"`

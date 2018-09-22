@@ -5,6 +5,7 @@ import (
 	"io"
 	"strconv"
 	"sync"
+	"time"
 	
 	"github.com/mediocregopher/radix.v2/redis"
 	rpool "github.com/mediocregopher/radix.v2/pool"
@@ -134,21 +135,30 @@ func (this *iRedisCmdRunner) addValuesForKeys(conn *redis.Client, keys []*dto.Ke
 		case typeHash : conn.PipeAppend("HGETALL", key.Key)
 		default : conn.PipeAppend("GET", key.Key)
 		}
+		// Also issue a command getting the time-to-live of the key
+		conn.PipeAppend("TTL", key.Key)
 	}
 	// Get responses off pipeline
 	resps, err := getResponsesFromPipeline(conn)
 	if err != nil { return err }
-	for i, resp := range resps {
-		key := keys[i]
+	nowSeconds := time.Now().Unix()
+	for i, key := range keys {
+		valResp := resps[i*2]
 		switch key.Type {
-		case "" : err = this.getValForStringKey(key, resp)
-		case typeList : err = this.getValForListOrSetKey(key, resp)
-		case typeSet : err = this.getValForListOrSetKey(key, resp)
-		case typeZset : err = this.getValForZsetKey(key, resp)
-		case typeHash : err = this.getValForHashKey(key, resp)
-		default : err = this.getValForStringKey(key, resp)
+		case "" : err = this.getValForStringKey(key, valResp)
+		case typeList : err = this.getValForListOrSetKey(key, valResp)
+		case typeSet : err = this.getValForListOrSetKey(key, valResp)
+		case typeZset : err = this.getValForZsetKey(key, valResp)
+		case typeHash : err = this.getValForHashKey(key, valResp)
+		default : err = this.getValForStringKey(key, valResp)
 		}
 		if err != nil { return err }
+		ttlResp := resps[i*2+1]
+		ttl, err := ttlResp.Int64()
+		if err != nil { return err }
+		if ttl > 0 {
+			key.ExpAt = nowSeconds + ttl
+		}
 	}
 	return nil
 }
