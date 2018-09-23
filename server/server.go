@@ -67,7 +67,7 @@ func (this *RedisServer) UpsertConnections(w http.ResponseWriter,
 		return
 	}
 	
-	err = rconns.UpsertConnections(reqObj.Connections)
+	err = rconns.UpsertConnections(reqObj)
 	if err != nil {
 		processError(w, "Error upserting connections:", err)
 		return
@@ -106,7 +106,7 @@ func (this *RedisServer) TestConnection(w http.ResponseWriter,
 	w.Header().Add("Content-Type", "application/json")
 	
 	reader := r.Body
-	conn := new(rconns.Connection)
+	conn := new(dto.Connection)
 	err := json.NewDecoder(reader).Decode(conn)
 	if err != nil {
 		processError(w, "Error decoding json:", err)
