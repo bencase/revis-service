@@ -7,6 +7,7 @@ import (
 	
 	"gopkg.in/yaml.v2"
 	
+	"github.com/bencase/revis-service/dto"
 	"github.com/bencase/revis-service/util"
 	"github.com/bencase/revis-service/connections/encrypt"
 )
@@ -15,28 +16,28 @@ const filename = "conns.yml"
 
 var ConnectionNotFoundError = errors.New("Could not find connection with that name")
 
-func readConnectionsNoDecrypt() ([]*Connection, error) {
+func readConnectionsNoDecrypt() ([]*dto.Connection, error) {
 	// If the file doesn't exist, return an empty list
 	if fileDoesntExist() {
-		return []*Connection{}, nil
+		return []*dto.Connection{}, nil
 	}
 	
 	// Get current contents of connections file
 	inBytes, err := ioutil.ReadFile(filename)
-	if err != nil { return []*Connection{}, err }
-	conns := make([]*Connection, 0)
+	if err != nil { return []*dto.Connection{}, err }
+	conns := make([]*dto.Connection, 0)
 	err = yaml.Unmarshal(inBytes, &conns)
 	return conns, err
 }
-func ReadConnections() ([]*Connection, error) {
+func ReadConnections() ([]*dto.Connection, error) {
 	conns, err := readConnectionsNoDecrypt()
-	if err != nil { return []*Connection{}, err }
+	if err != nil { return []*dto.Connection{}, err }
 
 	// Decrypt passwords
 	for _, conn := range conns {
 		if conn.Password != "" {
 			decryptedPwd, err := encrypt.DecryptFromBase64(conn.Password)
-			if err != nil { return []*Connection{}, err }
+			if err != nil { return []*dto.Connection{}, err }
 			conn.Password = decryptedPwd
 		}
 	}
@@ -46,52 +47,32 @@ func ReadConnections() ([]*Connection, error) {
 // Gets the connection that has the provided name, looking instead at
 // combined host and port on connections that have no name. If no such
 // connection exists, returns nil without error.
-func GetConnectionWithName(name string) (*Connection, error) {
+func GetConnectionWithName(name string) (*dto.Connection, error) {
 	conns, err := ReadConnections()
 	if err != nil {
 		return nil, err
 	}
 	for _, conn := range conns {
-		if conn.GetEffectiveName() == name {
+		if GetEffectiveNameOfConn(conn) == name {
 			return conn, nil
 		}
 	}
 	return nil, nil
 }
 
-func UpsertConnections(newConnsOriginal []*Connection) error {
-	// Encrypt the passwords of the new connections
-	newConns, err := getConnsWithPasswordsEncrypted(newConnsOriginal)
-	if err != nil { return err }
-
+func UpsertConnections(reqObj *dto.UpsertConnectionsRequest) error {
 	// Get current contents of connections file
-	prevConns, err := readConnectionsNoDecrypt()
+	conns, err := readConnectionsNoDecrypt()
 	if err != nil { return err }
-	
-	// Create a list of connections with all previous connections and the new ones
-	allConns := make([]*Connection, 0)
-	// Go through each previous connection. If there isn't a new connection with
-	// the same name, add it.
-	for _, conn := range prevConns {
-		hasFoundMatchingName := false
-		// Iterate through the new connections
-		for _, newConn := range newConns {
-			if conn.GetEffectiveName() == newConn.GetEffectiveName() {
-				hasFoundMatchingName = true
-				break
-			}
-		}
-		if !hasFoundMatchingName {
-			allConns = append(allConns, conn)
-		}
+	// Upsert connections
+	for _, connUpsert := range reqObj.Connections {
+		newConn := connUpsert.NewConn
+		replace := connUpsert.OldConnName
+		err = upsertConnection(newConn, replace, &conns)
+		if err != nil { return err }
 	}
-	// Add all the new conns
-	for _, newConn := range newConns {
-		allConns = append(allConns, newConn)
-	}
-	
 	// Rewrite all connections
-	err = writeConnections(allConns)
+	err = writeConnections(conns)
 	if err == nil {
 		logger.Info("Upserted connections to file")
 	} else {
@@ -99,18 +80,47 @@ func UpsertConnections(newConnsOriginal []*Connection) error {
 	}
 	return err
 }
-func getConnsWithPasswordsEncrypted(origConns []*Connection) ([]*Connection, error) {
-	encryptedConns := make([]*Connection, 0)
-	for _, conn := range origConns {
-		encryptedConn := *conn
-		if encryptedConn.Password != "" {
-			encryptedPwd, err := encrypt.EncryptToBase64(encryptedConn.Password)
-			if err != nil { return nil, err }
-			encryptedConn.Password = encryptedPwd
+func upsertConnection(newConn *dto.Connection, replace string, pConns *[]*dto.Connection) error {
+	encryptedNewConn, err := getConnWithPasswordEncrypted(newConn)
+	if err != nil { return err }
+	conns := *pConns
+	hasReplacedConn := false
+	if replace != "" {
+		indexOfConnToReplace := -1
+		for i, originalConn := range conns {
+			if replace == GetEffectiveNameOfConn(originalConn) {
+				indexOfConnToReplace = i
+				break
+			}
 		}
-		encryptedConns = append(encryptedConns, &encryptedConn)
+		if indexOfConnToReplace >= 0 {
+			conns[indexOfConnToReplace] = encryptedNewConn
+			hasReplacedConn = true
+		}
+	}
+	if !hasReplacedConn {
+		conns = append(conns, encryptedNewConn)
+	}
+	*pConns = conns
+	return nil
+}
+func getConnsWithPasswordsEncrypted(origConns []*dto.Connection) ([]*dto.Connection, error) {
+	encryptedConns := make([]*dto.Connection, 0)
+	for _, conn := range origConns {
+		encryptedConn, err := getConnWithPasswordEncrypted(conn)
+		if err != nil { return nil, err }
+		encryptedConns = append(encryptedConns, encryptedConn)
 	}
 	return encryptedConns, nil
+}
+func getConnWithPasswordEncrypted(conn *dto.Connection) (*dto.Connection, error) {
+	encryptedConn := *conn
+	if encryptedConn.Password != "" {
+		encryptedPwd, err := encrypt.EncryptToBase64(encryptedConn.Password)
+		if err != nil { return nil, err }
+		encryptedConn.Password = encryptedPwd
+	}
+	return &encryptedConn, nil
 }
 
 func DeleteConnections(connNames []string) error {
@@ -125,9 +135,9 @@ func DeleteConnections(connNames []string) error {
 	
 	// Create a new slice of connections, with any connections having a name
 	// in the provided string slice removed
-	allConns := make([]*Connection, 0)
+	allConns := make([]*dto.Connection, 0)
 	for _, conn := range prevConns {
-		if !util.ContainsString(connNames, conn.GetEffectiveName()) {
+		if !util.ContainsString(connNames, GetEffectiveNameOfConn(conn)) {
 			allConns = append(allConns, conn)
 		}
 	}
@@ -147,7 +157,7 @@ func fileDoesntExist() bool {
 	return os.IsNotExist(err)
 }
 
-func writeConnections(conns []*Connection) error {
+func writeConnections(conns []*dto.Connection) error {
 	// Create (or truncate if already exists) the file
 	file, err := os.Create(filename)
 	if err != nil { return err }

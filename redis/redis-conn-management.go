@@ -6,7 +6,7 @@ import (
 
 	"github.com/mediocregopher/radix.v2/redis"
 
-	conns "github.com/bencase/revis-service/connections"
+	"github.com/bencase/revis-service/dto"
 )
 
 
@@ -58,7 +58,7 @@ func getDialFunc(password string, db int, timeout time.Duration) func(network st
 }
 
 
-func TestConn(conn *conns.Connection) error {
+func TestConn(conn *dto.Connection) error {
 	client, err := getConn(conn.Host, conn.Port, conn.Password, conn.Db, defaultTimeout)
 	if err != nil {
 		return err

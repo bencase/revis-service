@@ -2,8 +2,6 @@ package dto
 
 import (
 	"encoding/json"
-	
-	conns "github.com/bencase/revis-service/connections"
 )
 
 
@@ -18,7 +16,11 @@ type KeysRequest struct {
 
 
 type UpsertConnectionsRequest struct {
-	Connections []*conns.Connection `json:"connections"`
+	Connections []*ConnUpsert `json:"connections"`
+}
+type ConnUpsert struct {
+	OldConnName string `json:"oldConnName,omitempty"`
+	NewConn *Connection `json:"newConn"`
 }
 type DeleteConnectionsRequest struct {
 	ConnectionNames []string `json:"connectionNames"`
@@ -60,7 +62,7 @@ type HashVal struct {
 
 
 type ConnectionsResponse struct {
-	Connections []*conns.Connection `json:"connections"`
+	Connections []*Connection `json:"connections"`
 	ErrorContainer
 }
 func (this *ConnectionsResponse) JsonBytes() ([]byte, error) {
