@@ -7,6 +7,7 @@ import (
 	
 	"gopkg.in/yaml.v2"
 	
+	"github.com/bencase/revis-service/config"
 	"github.com/bencase/revis-service/dto"
 	"github.com/bencase/revis-service/util"
 	"github.com/bencase/revis-service/connections/encrypt"
@@ -23,7 +24,7 @@ func readConnectionsNoDecrypt() ([]*dto.Connection, error) {
 	}
 	
 	// Get current contents of connections file
-	inBytes, err := ioutil.ReadFile(filename)
+	inBytes, err := ioutil.ReadFile(config.LibraryPath + filename)
 	if err != nil { return []*dto.Connection{}, err }
 	conns := make([]*dto.Connection, 0)
 	err = yaml.Unmarshal(inBytes, &conns)
@@ -153,13 +154,13 @@ func DeleteConnections(connNames []string) error {
 }
 
 func fileDoesntExist() bool {
-	_, err := os.Stat(filename)
+	_, err := os.Stat(config.LibraryPath + filename)
 	return os.IsNotExist(err)
 }
 
 func writeConnections(conns []*dto.Connection) error {
 	// Create (or truncate if already exists) the file
-	file, err := os.Create(filename)
+	file, err := os.Create(config.LibraryPath + filename)
 	if err != nil { return err }
 	
 	// Write to the file

@@ -237,7 +237,8 @@ func (this *RedisServer) Close() error {
 func processError(w http.ResponseWriter, logMessagePrefix string, err error) {
 	logger.Error(logMessagePrefix, err)
 	w.WriteHeader(500)
-	message := "There was an error processing the request"
+	//message := "There was an error processing the request"
+	message := err.Error()
 	errResp := &dto.ErrorResponse{Message: message}
 
 	respObj := &dto.BaseResponse{}
