@@ -14,7 +14,7 @@ func init() {
 		logger.Error("Error trying to find home directory:", err.Error())
 		return
 	}
-	libraryPathWithoutTrailingSlash = dir + "/Library/Containers/com.electron.revis/Data/Documents"
+	libraryPathWithoutTrailingSlash := dir + "/Library/Containers/com.electron.revis/Data/Documents"
 	LibraryPath = libraryPathWithoutTrailingSlash + "/"
 	// If this directory doesn't exist, create it
 	_, err = os.Stat(libraryPathWithoutTrailingSlash)
