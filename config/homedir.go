@@ -4,6 +4,6 @@ import (
 	glogging "github.com/op/go-logging"
 )
 
-const LibraryPath = ""
+var LibraryPath = ""
 
 var logger = glogging.MustGetLogger("config")
